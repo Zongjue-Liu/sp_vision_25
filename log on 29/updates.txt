@@ -1,0 +1,4 @@
+Updates mainly on correction,planner branch.I modified tools/trajectory.cpp/.hpp 和 tasks/auto_aim/planner/planner.cpp/.hpp.
+The old code Trajectory only considered the gravity,I added a 2-diminsional air resistance model a_drag = -k * |v| * v for the farer shots(NOT USED IN SHORT DISTENCE)
+At the same time,I added the correction of bullet speed,the system delay correction,yaw/pitch bias of the gun cube correction and the protection of valid pitch.
+That's the original version,maybe further updates could be done.
