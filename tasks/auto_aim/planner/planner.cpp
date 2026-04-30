@@ -1,5 +1,7 @@
 #include "planner.hpp"
 
+#include <cmath>
+#include <stdexcept>
 #include <vector>
 
 #include "tools/math_tools.hpp"
@@ -10,6 +12,16 @@ using namespace std::chrono_literals;
 
 namespace auto_aim
 {
+namespace
+{
+template <typename T>
+T read_or(const YAML::Node & yaml, const std::string & key, const T & default_value)
+{
+  if (yaml[key]) return yaml[key].as<T>();
+  return default_value;
+}
+}  // namespace
+
 Planner::Planner(const std::string & config_path)
 {
   auto yaml = tools::load(config_path);
@@ -19,6 +31,17 @@ Planner::Planner(const std::string & config_path)
   decision_speed_ = tools::read<double>(yaml, "decision_speed");
   high_speed_delay_time_ = tools::read<double>(yaml, "high_speed_delay_time");
   low_speed_delay_time_ = tools::read<double>(yaml, "low_speed_delay_time");
+
+  // Ballistic compensation branch. All parameters are optional so old configs still work.
+  trajectory_drag_coefficient_ = read_or<double>(yaml, "trajectory_drag_coefficient", 0.018);
+  trajectory_drag_enable_distance_ = read_or<double>(yaml, "trajectory_drag_enable_distance", 6.0);
+  ballistic_speed_scale_ = read_or<double>(yaml, "ballistic_speed_scale", 1.0);
+  ballistic_speed_bias_ = read_or<double>(yaml, "ballistic_speed_bias", 0.0);
+  ballistic_system_delay_ = read_or<double>(yaml, "ballistic_system_delay", 0.0);
+  barrel_yaw_offset_ = read_or<double>(yaml, "barrel_yaw_offset", 0.0) / 57.3;
+  barrel_pitch_offset_ = read_or<double>(yaml, "barrel_pitch_offset", 0.0) / 57.3;
+  ballistic_min_pitch_ = read_or<double>(yaml, "ballistic_min_pitch", -35.0) / 57.3;
+  ballistic_max_pitch_ = read_or<double>(yaml, "ballistic_max_pitch", 35.0) / 57.3;
 
   setup_yaw_solver(config_path);
   setup_pitch_solver(config_path);
@@ -41,8 +64,15 @@ Plan Planner::plan(Target target, double bullet_speed)
       xyz = xyza.head<3>();
     }
   }
-  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
-  target.predict(bullet_traj.fly_time);
+
+  const double effective_speed = effective_bullet_speed(bullet_speed);
+  auto bullet_traj =
+    tools::Trajectory(effective_speed, min_dist, xyz.z(), drag_coefficient_for_distance(min_dist));
+  if (bullet_traj.unsolvable || !valid_ballistic_pitch(bullet_traj.pitch)) {
+    tools::logger()->warn("Unsolvable ballistic prediction: speed {:.2f}, distance {:.2f}", effective_speed, min_dist);
+    return {false};
+  }
+  target.predict(bullet_traj.fly_time + ballistic_system_delay_);
 
   // 2. Get trajectory
   double yaw0;
@@ -51,7 +81,7 @@ Plan Planner::plan(Target target, double bullet_speed)
     yaw0 = aim(target, bullet_speed)(0);
     traj = get_trajectory(target, yaw0, bullet_speed);
   } catch (const std::exception & e) {
-    tools::logger()->warn("Unsolvable target {:.2f}", bullet_speed);
+    tools::logger()->warn("Unsolvable target {:.2f}: {}", bullet_speed, e.what());
     return {false};
   }
 
@@ -153,6 +183,24 @@ void Planner::setup_pitch_solver(const std::string & config_path)
   pitch_solver_->settings->max_iter = 10;
 }
 
+double Planner::effective_bullet_speed(double bullet_speed) const
+{
+  const double effective_speed = bullet_speed * ballistic_speed_scale_ + ballistic_speed_bias_;
+  return effective_speed > 1.0 ? effective_speed : 1.0;
+}
+
+double Planner::drag_coefficient_for_distance(double distance) const
+{
+  if (trajectory_drag_coefficient_ <= 0.0) return 0.0;
+  if (distance < trajectory_drag_enable_distance_) return 0.0;
+  return trajectory_drag_coefficient_;
+}
+
+bool Planner::valid_ballistic_pitch(double pitch) const
+{
+  return std::isfinite(pitch) && pitch >= ballistic_min_pitch_ && pitch <= ballistic_max_pitch_;
+}
+
 Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_speed)
 {
   Eigen::Vector3d xyz;
@@ -170,10 +218,17 @@ Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_sp
   debug_xyza = Eigen::Vector4d(xyz.x(), xyz.y(), xyz.z(), yaw);
 
   auto azim = std::atan2(xyz.y(), xyz.x());
-  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
+  const double effective_speed = effective_bullet_speed(bullet_speed);
+  auto bullet_traj =
+    tools::Trajectory(effective_speed, min_dist, xyz.z(), drag_coefficient_for_distance(min_dist));
   if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
+  if (!valid_ballistic_pitch(bullet_traj.pitch)) {
+    throw std::runtime_error("Ballistic pitch out of valid range!");
+  }
 
-  return {tools::limit_rad(azim + yaw_offset_), -bullet_traj.pitch - pitch_offset_};
+  return {
+    tools::limit_rad(azim + yaw_offset_ + barrel_yaw_offset_),
+    -bullet_traj.pitch - pitch_offset_ - barrel_pitch_offset_};
 }
 
 Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_speed)
