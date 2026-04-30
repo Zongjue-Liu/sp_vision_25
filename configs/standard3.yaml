@@ -35,7 +35,11 @@ max_rectangular_error: 25 # degree
 min_detect_count: 5
 max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
-
+# 修改增加：
+track_high_thresh: 0.6
+track_low_thresh: 0.15
+new_target_thresh: 0.7
+#结束
 #####-----aimer参数-----#####
 yaw_offset: 2 # degree -2.5
 pitch_offset: 6.5 # degree 2

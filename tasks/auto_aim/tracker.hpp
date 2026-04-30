@@ -36,6 +36,11 @@ private:
   int max_temp_lost_count_;
   int detect_count_;
   int temp_lost_count_;
+  //修改增加：
+  double track_high_thresh_;
+  double track_low_thresh_;
+  double new_target_thresh_;
+  //结束
   int outpost_max_temp_lost_count_;
   int normal_temp_lost_count_;
   std::string state_, pre_state_;
@@ -48,6 +53,9 @@ private:
   bool set_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t);
 
   bool update_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t);
+  //以下是新增
+  bool match_target(const Armor & armor, bool use_strict_gate) const;
+  //结束
 };
 
 }  // namespace auto_aim

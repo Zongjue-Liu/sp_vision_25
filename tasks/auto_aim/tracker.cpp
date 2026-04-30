@@ -23,6 +23,16 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   min_detect_count_ = yaml["min_detect_count"].as<int>();
   max_temp_lost_count_ = yaml["max_temp_lost_count"].as<int>();
   outpost_max_temp_lost_count_ = yaml["outpost_max_temp_lost_count"].as<int>();
+//修改增加：
+  track_high_thresh_ =
+    yaml["track_high_thresh"].IsDefined() ? yaml["track_high_thresh"].as<double>() : 0.6;
+
+  track_low_thresh_ =
+    yaml["track_low_thresh"].IsDefined() ? yaml["track_low_thresh"].as<double>() : 0.15;
+
+  new_target_thresh_ =
+    yaml["new_target_thresh"].IsDefined() ? yaml["new_target_thresh"].as<double>() : 0.7;
+//结束
   normal_temp_lost_count_ = max_temp_lost_count_;
 }
 
@@ -230,6 +240,11 @@ void Tracker::state_machine(bool found)
 
 bool Tracker::set_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t)
 {
+  //修改增加
+  armors.remove_if([this](const Armor & armor) {
+      return armor.confidence < new_target_thresh_;
+    });
+  //修改结束
   if (armors.empty()) return false;
 
   auto & armor = armors.front();
@@ -265,31 +280,88 @@ bool Tracker::set_target(std::list<Armor> & armors, std::chrono::steady_clock::t
 
 bool Tracker::update_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t)
 {
-  target_.predict(t);
+  //以下是删除
+  //target_.predict(t);
 
-  int found_count = 0;
-  double min_x = 1e10;  // 画面最左侧
-  for (const auto & armor : armors) {
-    if (armor.name != target_.name || armor.type != target_.armor_type) continue;
-    found_count++;
-    min_x = armor.center.x < min_x ? armor.center.x : min_x;
-  }
+  //int found_count = 0;
+  //double min_x = 1e10;  // 画面最左侧
+  //for (const auto & armor : armors) {
+    //if (armor.name != target_.name || armor.type != target_.armor_type) continue;
+    //found_count++;
+    //min_x = armor.center.x < min_x ? armor.center.x : min_x;
+  //}
 
-  if (found_count == 0) return false;
+  //if (found_count == 0) return false;
 
-  for (auto & armor : armors) {
-    if (
-      armor.name != target_.name || armor.type != target_.armor_type
+  //for (auto & armor : armors) {
+    //if (
+      //armor.name != target_.name || armor.type != target_.armor_type
       //  || armor.center.x != min_x
-    )
-      continue;
+    //)
+      //continue;
 
+    //solver_.solve(armor);
+
+    //target_.update(armor);
+  //}
+
+  //return true;
+//}
+
+//以下是新增
+ {
+    target_.predict(t);
+
+    std::list<Armor> high_score_armors;
+    std::list<Armor> low_score_armors;
+
+    for (const auto & armor : armors) {
+      if (armor.name != target_.name || armor.type != target_.armor_type) continue;
+
+      if (armor.confidence >= track_high_thresh_) {
+        high_score_armors.push_back(armor);
+      } else if (armor.confidence >= track_low_thresh_) {
+        low_score_armors.push_back(armor);
+      }
+    }
+
+    for (auto & armor : high_score_armors) {
     solver_.solve(armor);
 
+    if (!match_target(armor, false)) continue;
+
     target_.update(armor);
+    return true;
   }
 
-  return true;
-}
+  for (auto & armor : low_score_armors) {
+    solver_.solve(armor);
 
+    if (!match_target(armor, true)) continue;
+
+    target_.update(armor);
+    return true;
+  }
+//新增match target
+
+bool Tracker::match_target(const Armor & armor, bool strict) const
+  {
+    if (armor.name != target_.name || armor.type != target_.armor_type) {
+      return false;
+    }
+
+    auto predicted_armors = target_.armor_xyza_list();
+
+    double min_distance = 1e10;
+    for (const auto & predicted_armor : predicted_armors) {
+      double distance = (armor.xyz_in_world - predicted_armor.head<3>()).norm();
+      min_distance = std::min(min_distance, distance);
+    }
+
+    double distance_gate = strict ? 0.35 : 0.7;
+
+    return min_distance < distance_gate;
+  }
+
+//结束
 }  // namespace auto_aim
