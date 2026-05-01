@@ -6,7 +6,9 @@
 
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
-
+//新增
+#include <algorithm>
+//结束
 namespace auto_aim
 {
 Tracker::Tracker(const std::string & config_path, Solver & solver)
@@ -309,7 +311,7 @@ bool Tracker::update_target(std::list<Armor> & armors, std::chrono::steady_clock
 //}
 
 //以下是新增
- {
+
     target_.predict(t);
 
     std::list<Armor> high_score_armors;
@@ -342,10 +344,14 @@ bool Tracker::update_target(std::list<Armor> & armors, std::chrono::steady_clock
     target_.update(armor);
     return true;
   }
+  return false;
+}
+
 //新增match target
 
-bool Tracker::match_target(const Armor & armor, bool strict) const
-  {
+bool Tracker::match_target(const Armor & armor, bool strict) 
+const
+{
     if (armor.name != target_.name || armor.type != target_.armor_type) {
       return false;
     }
@@ -361,7 +367,7 @@ bool Tracker::match_target(const Armor & armor, bool strict) const
     double distance_gate = strict ? 0.35 : 0.7;
 
     return min_distance < distance_gate;
-  }
+}
 
 //结束
 }  // namespace auto_aim

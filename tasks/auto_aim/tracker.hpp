@@ -54,7 +54,7 @@ private:
 
   bool update_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t);
   //以下是新增
-  bool match_target(const Armor & armor, bool use_strict_gate) const;
+  bool match_target(const Armor & armor, bool strict) const;
   //结束
 };
 
