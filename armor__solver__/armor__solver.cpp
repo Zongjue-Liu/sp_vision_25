@@ -2,7 +2,7 @@
 #include <vector>
 #include <limits>
 #include <yaml-cpp/yaml.h>
-#include"armor__solve.hpp"
+#include "armor__solver.hpp"
 
 namespace HNU_NHS_Vision::auto_aim{
 constexpr double LIGHTBAR_LENGTH = 56e-3;     
