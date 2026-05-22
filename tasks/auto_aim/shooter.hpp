@@ -25,6 +25,10 @@ private:
   bool auto_fire_;
   int fire_count_ = 0;
   int fire_threshold_;
+  double last_speed_;
+  double stop_threshold_;
+  int stop_count_;
+  int stop_cool_down_;
 };
 }  // namespace auto_aim
 
