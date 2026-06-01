@@ -45,26 +45,11 @@ private:
   double fire_thresh_;
   double low_speed_delay_time_, high_speed_delay_time_, decision_speed_;
 
-  // Hybrid ballistic compensation parameters.
-  double trajectory_drag_coefficient_;
-  double trajectory_drag_enable_distance_;
-  double ballistic_speed_scale_;
-  double ballistic_speed_bias_;
-  double ballistic_system_delay_;
-  double barrel_yaw_offset_;
-  double barrel_pitch_offset_;
-  double ballistic_min_pitch_;
-  double ballistic_max_pitch_;
-
   TinySolver * yaw_solver_;
   TinySolver * pitch_solver_;
 
   void setup_yaw_solver(const std::string & config_path);
   void setup_pitch_solver(const std::string & config_path);
-
-  double effective_bullet_speed(double bullet_speed) const;
-  double drag_coefficient_for_distance(double distance) const;
-  bool valid_ballistic_pitch(double pitch) const;
 
   Eigen::Matrix<double, 2, 1> aim(const Target & target, double bullet_speed);
   Trajectory get_trajectory(Target & target, double yaw0, double bullet_speed);
