@@ -8,9 +8,8 @@ add_subdirectory(planner/tinympc)
 
 add_library(auto_aim OBJECT 
     armor.cpp
-    classifier.cpp 
+    classifier.cpp
     detector.cpp
-    solver.cpp
     aimer.cpp
     target.cpp
     tracker.cpp
@@ -25,4 +24,4 @@ add_library(auto_aim OBJECT
     planner/planner.cpp
 )
 
-target_link_libraries(auto_aim io openvino::runtime tinympcstatic)
+target_link_libraries(auto_aim io openvino::runtime tinympcstatic armor_solver)
