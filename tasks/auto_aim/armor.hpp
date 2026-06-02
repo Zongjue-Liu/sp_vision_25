@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace  HNU_NHS_Vision::auto_aim
+namespace auto_aim
 {
 enum Color
 {

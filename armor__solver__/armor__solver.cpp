@@ -1,10 +1,9 @@
-#include<iostream>
 #include <vector>
 #include <limits>
 #include <yaml-cpp/yaml.h>
 #include "armor__solver.hpp"
 
-namespace HNU_NHS_Vision::auto_aim{
+namespace auto_aim{
 constexpr double LIGHTBAR_LENGTH = 56e-3;     
 constexpr double BIG_ARMOR_WIDTH = 230e-3;    
 constexpr double SMALL_ARMOR_WIDTH = 135e-3;  //定义基本物理尺寸
