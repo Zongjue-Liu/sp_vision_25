@@ -12,6 +12,7 @@
 #include "tasks/auto_aim/shooter.hpp"
 #include "tasks/auto_aim/solver.hpp"
 #include "tasks/auto_aim/tracker.hpp"
+#include "tasks/auto_aim/predictor.hpp"
 #include "tasks/auto_aim/yolo.hpp"
 #include "tools/exiter.hpp"
 #include "tools/img_tools.hpp"
@@ -46,6 +47,7 @@ int main(int argc, char * argv[])
   auto_aim::Solver solver(config_path);
   auto_aim::Tracker tracker(config_path, solver);
   auto_aim::Aimer aimer(config_path);
+  auto_aim::Predictor predictor(config_path);
   auto_aim::Shooter shooter(config_path);
   auto_aim::multithread::CommandGener commandgener(shooter, aimer, cboard, plotter, true);
 
@@ -79,6 +81,35 @@ int main(int argc, char * argv[])
     Eigen::Vector3d ypr = tools::eulers(solver.R_gimbal2world(), 2, 1, 0);
 
     auto targets = tracker.track(armors, t);
+
+    // Predictor 旁路更新（不改变原有 targets 流程）
+    if (!targets.empty()) {
+      auto target = targets.front();
+
+      static auto last_predict_time = t;
+      double dt = std::chrono::duration<double>(t - last_predict_time).count();
+      last_predict_time = t;
+
+      if (dt <= 0.0 || dt > 0.2) {
+        dt = 0.02;
+      }
+
+      if (!predictor.initialized()) {
+        predictor.init(target);
+      }
+
+      auto predicted_state = predictor.update(target, dt);
+
+      fmt::print(
+        "[Predictor] pos=({:.3f}, {:.3f}, {:.3f}), vel=({:.3f}, {:.3f}, {:.3f})\n",
+        predicted_state.position.x(),
+        predicted_state.position.y(),
+        predicted_state.position.z(),
+        predicted_state.velocity.x(),
+        predicted_state.velocity.y(),
+        predicted_state.velocity.z()
+      );
+    }
 
     commandgener.push(targets, t, cboard.bullet_speed, ypr);  // 发送给决策线程
 
